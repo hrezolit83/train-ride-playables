@@ -763,7 +763,7 @@ ui.innerHTML = `
     <div class="value"><span id="pcount">0</span></div>
   </div>
   <div id="btnRow">
-    <button id="removeWagonBtn" title="Remove wagon">−</button>
+    <button id="removeWagonBtn" title="Remove wagon" aria-label="Remove wagon"></button>
     <button id="addWagonBtn">+ Add Wagon (<span id="wcount">3</span>/<span id="wmax">5</span>)</button>
   </div>
 `;
@@ -803,9 +803,19 @@ style.textContent = `
   }
   #removeWagonBtn {
     background: linear-gradient(180deg,#e74c3c,#b03a2e);
-    width: 44px; height: 44px; font-size: 22px; border-radius: 22px;
-    line-height: 1;
+    width: 44px; height: 44px; border-radius: 22px;
     flex-shrink: 0;
+    padding: 0;
+    position: relative;
+  }
+  #removeWagonBtn::before {
+    content: "";
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 18px; height: 3px;
+    background: #fff;
+    border-radius: 2px;
+    transform: translate(-50%, -50%);
   }
   #addWagonBtn:disabled, #removeWagonBtn:disabled { background: #888; cursor: not-allowed; opacity: 0.7; }
   #hint {
@@ -816,7 +826,8 @@ style.textContent = `
   }
   @media (max-width: 480px) {
     #addWagonBtn { padding: 11px 16px; font-size: 14px; }
-    #removeWagonBtn { width: 42px; height: 42px; font-size: 20px; }
+    #removeWagonBtn { width: 42px; height: 42px; }
+    #removeWagonBtn::before { width: 16px; height: 3px; }
   }
 `;
 document.head.appendChild(style);
