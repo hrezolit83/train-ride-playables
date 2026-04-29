@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//h/tmp/**)",
+      "WebFetch(domain:train-ride-playables.netlify.app)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

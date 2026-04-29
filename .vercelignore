@@ -1,0 +1,8 @@
+Assets/
+build/
+*.fbx
+photo.png
+screen*.png
+task.txt
+.git/
+node_modules/

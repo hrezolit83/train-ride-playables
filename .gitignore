@@ -1,0 +1,14 @@
+node_modules/
+.DS_Store
+*.log
+.vercel/
+.netlify/
+
+# Heavy build inputs / dev artifacts (kept locally)
+# Comment these out if you DO want to push them
+# Assets/
+# build/
+# *.fbx
+# screen*.png
+# photo.png
+# task.txt
