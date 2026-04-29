@@ -783,29 +783,40 @@ style.textContent = `
   #counter .label { font-size: 12px; opacity: 0.85; letter-spacing: 1px; text-transform: uppercase; }
   #counter .value { font-size: 28px; font-weight: 800; margin-top: 2px; }
   #btnRow {
-    position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%);
+    position: absolute; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
     display: flex; gap: 10px; align-items: center;
     pointer-events: none;
+    white-space: nowrap;
   }
   #addWagonBtn, #removeWagonBtn {
     pointer-events: auto;
     color: #fff; border: none; font-weight: 700;
     cursor: pointer; box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
   #addWagonBtn {
     background: linear-gradient(180deg,#2ecc71,#1f9e57);
-    padding: 14px 24px; font-size: 16px; border-radius: 30px;
+    padding: 12px 20px; font-size: 15px; border-radius: 26px;
+    white-space: nowrap;
   }
   #removeWagonBtn {
     background: linear-gradient(180deg,#e74c3c,#b03a2e);
-    width: 48px; height: 48px; font-size: 24px; border-radius: 24px;
+    width: 44px; height: 44px; font-size: 22px; border-radius: 22px;
     line-height: 1;
+    flex-shrink: 0;
   }
   #addWagonBtn:disabled, #removeWagonBtn:disabled { background: #888; cursor: not-allowed; opacity: 0.7; }
   #hint {
-    position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%);
+    position: absolute; bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+    left: 50%; transform: translateX(-50%);
     color: #fff; background: rgba(0,0,0,0.4); padding: 8px 14px; border-radius: 18px;
     font-size: 13px; pointer-events: none;
+  }
+  @media (max-width: 480px) {
+    #addWagonBtn { padding: 11px 16px; font-size: 14px; }
+    #removeWagonBtn { width: 42px; height: 42px; font-size: 20px; }
   }
 `;
 document.head.appendChild(style);
