@@ -187,7 +187,7 @@ function buildTrack() {
 buildTrack();
 
 // ---------- Platform ----------
-const PLATFORM_T = 0.55; // location on track (parameter on curve)
+const PLATFORM_T = 0.15; // location on track (parameter on curve) - close to train start
 const PLATFORM_LENGTH = 12; // along tangent
 const PLATFORM_DEPTH = 4;
 const PLATFORM_HEIGHT = 0.6;
@@ -223,6 +223,47 @@ const platformGroup = new THREE.Group();
   );
   edge.position.set(0, PLATFORM_HEIGHT + 0.02, PLATFORM_DEPTH / 2 - 0.2);
   platformGroup.add(edge);
+
+  // Roof support columns (4 corners, set back from edge so they don't block view)
+  const colMat = new THREE.MeshLambertMaterial({ color: 0xe8e8e8 });
+  const COL_HEIGHT = 2.6;
+  const colInsetX = PLATFORM_LENGTH / 2 - 0.6;
+  const colInsetZ = -PLATFORM_DEPTH / 2 + 0.4; // back of platform
+  // Front columns at the front edge of the (narrow) roof, back columns at the back of platform
+  const ROOF_FRONT_Z = -PLATFORM_DEPTH / 2 + 0.2 + (PLATFORM_DEPTH * 0.55); // matches narrow roof front edge
+  const colPositions = [
+    [-colInsetX, colInsetZ],
+    [ colInsetX, colInsetZ],
+    [-colInsetX, ROOF_FRONT_Z - 0.3],
+    [ colInsetX, ROOF_FRONT_Z - 0.3]
+  ];
+  for (const [cx, cz] of colPositions) {
+    const col = new THREE.Mesh(new THREE.BoxGeometry(0.18, COL_HEIGHT, 0.18), colMat);
+    col.position.set(cx, PLATFORM_HEIGHT + COL_HEIGHT / 2, cz);
+    col.castShadow = true;
+    platformGroup.add(col);
+  }
+
+  // Narrow roof: only covers the back half of the platform (where passengers stand),
+  // leaving the front (track-side) open so they're visible
+  const ROOF_OVERHANG_X = 0.4;
+  const ROOF_DEPTH = PLATFORM_DEPTH * 0.55;
+  const ROOF_Z_CENTER = -PLATFORM_DEPTH / 2 + ROOF_DEPTH / 2 + 0.2; // shifted toward back
+  const roof = new THREE.Mesh(
+    new THREE.BoxGeometry(PLATFORM_LENGTH + ROOF_OVERHANG_X * 2, 0.18, ROOF_DEPTH),
+    new THREE.MeshLambertMaterial({ color: 0x4aa3d9 })
+  );
+  roof.position.set(0, PLATFORM_HEIGHT + COL_HEIGHT + 0.09, ROOF_Z_CENTER);
+  roof.castShadow = true;
+  platformGroup.add(roof);
+
+  // Roof underside trim (white band)
+  const trim = new THREE.Mesh(
+    new THREE.BoxGeometry(PLATFORM_LENGTH + ROOF_OVERHANG_X * 2 + 0.05, 0.06, ROOF_DEPTH + 0.05),
+    new THREE.MeshLambertMaterial({ color: 0xffffff })
+  );
+  trim.position.set(0, PLATFORM_HEIGHT + COL_HEIGHT - 0.02, ROOF_Z_CENTER);
+  platformGroup.add(trim);
 
   scene.add(platformGroup);
 }
@@ -475,9 +516,9 @@ let WAGON_FORWARD_AXIS = new THREE.Vector3(1, 0, 0); // local axis to align with
 const train = {
   headT: 0.05, // parametric position on track [0,1)
   speed: 0,
-  maxSpeed: 9.75, // units per sec
-  accel: 13.5,
-  decel: 10.5,
+  maxSpeed: 14, // units per sec
+  accel: 18,
+  decel: 13,
   isMoving: false,
   wagons: [],
   passengerCount: 0,
@@ -520,9 +561,12 @@ function rebuildTrain(count) {
   for (const w of train.wagons) trainGroup.remove(w);
   train.wagons.length = 0;
   for (let i = 0; i < count; i++) {
-    const kind = i === 0 ? 'loco' : 'carriage';
+    // First wagon = locomotive (forward), last wagon = locomotive (reversed)
+    const isLast = i === count - 1;
+    const kind = (i === 0 || isLast) ? 'loco' : 'carriage';
     const w = buildWagon(kind);
     w.userData.index = i;
+    w.userData.flipped = isLast && i !== 0; // back loco is flipped 180
     trainGroup.add(w);
     train.wagons.push(w);
   }
@@ -537,7 +581,7 @@ function updateTrainTransforms() {
     w.position.set(p.x, 0, p.z);
     const t = trackTangent(tt);
     const yaw = Math.atan2(t.x, t.z);
-    w.rotation.y = yaw;
+    w.rotation.y = w.userData.flipped ? yaw + Math.PI : yaw;
   }
 }
 
@@ -606,19 +650,14 @@ function updatePassengers(dt) {
   if (trainStopped && nearPlatform) {
     train.hasVisitedPlatform = true;
   }
-  // Train departs platform while passengers still waiting -> 70% chase, 30% leave
+  // Train departs platform while passengers still waiting -> they leave (walk away)
   // Only triggers if the train had previously stopped here AND is now leaving the platform area
   const leavingPlatform = train.hasVisitedPlatform && train.isMoving && train.speed > 1.5 && !nearPlatform;
   if (leavingPlatform) {
     for (const p of passengers) {
       if (p.state === 'waiting' && p.mesh.position.distanceTo(PLATFORM_BOARD_WORLD) < PLATFORM_LENGTH * 1.3) {
-        if (Math.random() < 0.7) {
-          p.state = 'chasing';
-          p.chaseTimer = 0;
-        } else {
-          p.state = 'leaving';
-          p.leaveDir = new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize();
-        }
+        p.state = 'leaving';
+        p.leaveDir = new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize();
       }
     }
     train.hasVisitedPlatform = false; // reset so next visit must occur first
@@ -735,7 +774,7 @@ ui.innerHTML = `
   </div>
   <div id="btnRow">
     <button id="removeWagonBtn" title="Remove wagon">−</button>
-    <button id="addWagonBtn">+ Add Wagon (<span id="wcount">2</span>/5)</button>
+    <button id="addWagonBtn">+ Add Wagon (<span id="wcount">3</span>/<span id="wmax">5</span>)</button>
   </div>
 `;
 document.body.appendChild(ui);
@@ -792,29 +831,32 @@ const wcountEl = document.getElementById('wcount');
 const addBtn = document.getElementById('addWagonBtn');
 const removeBtn = document.getElementById('removeWagonBtn');
 
+const MIN_WAGONS = 3; // 1 front loco + 1 carriage + 1 back loco
+const MAX_WAGONS = 5;
+
 function updateUI() {
   pcountEl.textContent = train.passengerCount;
   wcountEl.textContent = train.wagons.length;
-  addBtn.disabled = train.wagons.length >= 5;
-  removeBtn.disabled = train.wagons.length <= 1;
+  addBtn.disabled = train.wagons.length >= MAX_WAGONS;
+  removeBtn.disabled = train.wagons.length <= MIN_WAGONS;
 }
 
 addBtn.addEventListener('click', () => {
-  if (train.wagons.length < 5) {
+  if (train.wagons.length < MAX_WAGONS) {
     rebuildTrain(train.wagons.length + 1);
     updateUI();
   }
 });
 
 removeBtn.addEventListener('click', () => {
-  if (train.wagons.length > 1) {
+  if (train.wagons.length > MIN_WAGONS) {
     rebuildTrain(train.wagons.length - 1);
     updateUI();
   }
 });
 
 // ---------- Init train ----------
-rebuildTrain(2);
+rebuildTrain(MIN_WAGONS);
 updateUI();
 
 // position camera initially based on train head
@@ -843,8 +885,8 @@ function animate() {
   updateTrainTransforms();
 
   // sway animation
-  train.swayPhase += dt * 4.5; // speed of sway
-  const swayAmplitude = train.isMoving ? THREE.MathUtils.degToRad(2) : 0;
+  train.swayPhase += dt * 7; // speed of sway
+  const swayAmplitude = train.isMoving ? THREE.MathUtils.degToRad(5) : 0;
   for (let i = 0; i < train.wagons.length; i++) {
     const w = train.wagons[i];
     const sg = w.userData.swayGroup;
