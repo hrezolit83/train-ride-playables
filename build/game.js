@@ -221,21 +221,27 @@ const platformGroup = new THREE.Group();
     new THREE.BoxGeometry(PLATFORM_LENGTH, 0.04, 0.25),
     new THREE.MeshLambertMaterial({ color: 0xffe14a })
   );
-  edge.position.set(0, PLATFORM_HEIGHT + 0.02, PLATFORM_DEPTH / 2 - 0.2);
+  edge.position.set(0, PLATFORM_HEIGHT + 0.02, -PLATFORM_DEPTH / 2 + 0.2);
   platformGroup.add(edge);
 
-  // Roof support columns (4 corners, set back from edge so they don't block view)
+  // Narrow roof at the BACK (+Z) side of the platform.
+  // -Z is the track-facing (front) side, +Z is the back.
+  const ROOF_OVERHANG_X = 0.4;
+  const ROOF_DEPTH = PLATFORM_DEPTH * 0.45;
+  const ROOF_Z_CENTER = PLATFORM_DEPTH / 2 - ROOF_DEPTH / 2;
+  const ROOF_FRONT_EDGE_Z = ROOF_Z_CENTER - ROOF_DEPTH / 2;
+  const ROOF_BACK_EDGE_Z = ROOF_Z_CENTER + ROOF_DEPTH / 2;
+
+  // Roof support columns - placed exactly under the roof edges
   const colMat = new THREE.MeshLambertMaterial({ color: 0xe8e8e8 });
   const COL_HEIGHT = 2.6;
   const colInsetX = PLATFORM_LENGTH / 2 - 0.6;
-  const colInsetZ = -PLATFORM_DEPTH / 2 + 0.4; // back of platform
-  // Front columns at the front edge of the (narrow) roof, back columns at the back of platform
-  const ROOF_FRONT_Z = -PLATFORM_DEPTH / 2 + 0.2 + (PLATFORM_DEPTH * 0.55); // matches narrow roof front edge
+  const COL_INSET_FROM_EDGE = 0.15;
   const colPositions = [
-    [-colInsetX, colInsetZ],
-    [ colInsetX, colInsetZ],
-    [-colInsetX, ROOF_FRONT_Z - 0.3],
-    [ colInsetX, ROOF_FRONT_Z - 0.3]
+    [-colInsetX, ROOF_BACK_EDGE_Z - COL_INSET_FROM_EDGE],
+    [ colInsetX, ROOF_BACK_EDGE_Z - COL_INSET_FROM_EDGE],
+    [-colInsetX, ROOF_FRONT_EDGE_Z + COL_INSET_FROM_EDGE],
+    [ colInsetX, ROOF_FRONT_EDGE_Z + COL_INSET_FROM_EDGE]
   ];
   for (const [cx, cz] of colPositions) {
     const col = new THREE.Mesh(new THREE.BoxGeometry(0.18, COL_HEIGHT, 0.18), colMat);
@@ -243,12 +249,6 @@ const platformGroup = new THREE.Group();
     col.castShadow = true;
     platformGroup.add(col);
   }
-
-  // Narrow roof: only covers the back half of the platform (where passengers stand),
-  // leaving the front (track-side) open so they're visible
-  const ROOF_OVERHANG_X = 0.4;
-  const ROOF_DEPTH = PLATFORM_DEPTH * 0.55;
-  const ROOF_Z_CENTER = -PLATFORM_DEPTH / 2 + ROOF_DEPTH / 2 + 0.2; // shifted toward back
   const roof = new THREE.Mesh(
     new THREE.BoxGeometry(PLATFORM_LENGTH + ROOF_OVERHANG_X * 2, 0.18, ROOF_DEPTH),
     new THREE.MeshLambertMaterial({ color: 0x4aa3d9 })
@@ -689,40 +689,10 @@ function updatePassengers(dt) {
         p.mesh.rotation.y = Math.atan2(dir.x, dir.z);
       }
     } else if (p.state === 'chasing') {
-      p.chaseTimer = (p.chaseTimer || 0) + dt;
-      const lastW = train.wagons[train.wagons.length - 1];
-      // If train stopped far away from chaser, give up
-      const distToTrain = lastW ? lastW.position.distanceTo(p.mesh.position) : Infinity;
-      const trainStoppedFar = !train.isMoving && distToTrain > 6;
-      if (!lastW || p.chaseTimer > 7 || trainStoppedFar) {
-        p.state = 'leaving';
-        p.leaveDir = new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize();
-        continue;
-      }
-      const target = lastW.position.clone();
-      target.y = 0.15;
-      const dir = target.clone().sub(p.mesh.position);
-      dir.y = 0;
-      const dist = dir.length();
-      const chaseSpeed = 6.5;
-      if (dist < 0.6) {
-        // caught up - board last wagon
-        p.mesh.position.y -= dt * 4;
-        p.mesh.scale.multiplyScalar(Math.max(0.001, 1 - dt * 5));
-        if (p.mesh.scale.x < 0.05) {
-          scene.remove(p.mesh);
-          passengers.splice(i, 1);
-          train.passengerCount++;
-          updateUI();
-        }
-      } else {
-        dir.normalize();
-        p.mesh.position.x += dir.x * chaseSpeed * dt;
-        p.mesh.position.z += dir.z * chaseSpeed * dt;
-        const targetY = 0.15 + Math.abs(Math.sin(p.chaseTimer * 12)) * 0.18;
-        p.mesh.position.y += (targetY - p.mesh.position.y) * Math.min(1, dt * 8);
-        p.mesh.rotation.y = Math.atan2(dir.x, dir.z);
-      }
+      // Chasing disabled - convert to leaving immediately
+      p.state = 'leaving';
+      p.leaveDir = new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize();
+      continue;
     } else if (p.state === 'leaving') {
       const speed = 2.0;
       p.mesh.position.x += p.leaveDir.x * speed * dt;
