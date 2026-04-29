@@ -599,7 +599,7 @@ function randomCharacterTemplate() {
 
 function passengersOnPlatformCount() {
   let n = 0;
-  for (const p of passengers) if (p.state === 'waiting' || p.state === 'boarding') n++;
+  for (const p of passengers) if (p.state === 'waiting' || p.state === 'boarding' || p.state === 'returning') n++;
   return n;
 }
 
@@ -620,7 +620,7 @@ function spawnPassenger() {
   wrap.position.copy(world);
   wrap.rotation.y = Math.random() * Math.PI * 2;
   scene.add(wrap);
-  passengers.push({ mesh: wrap, state: 'waiting', vy: 0 });
+  passengers.push({ mesh: wrap, state: 'waiting', vy: 0, homePos: world.clone(), homeRot: wrap.rotation.y });
 }
 
 function updatePassengers(dt) {
@@ -655,9 +655,10 @@ function updatePassengers(dt) {
   const leavingPlatform = train.hasVisitedPlatform && train.isMoving && train.speed > 1.5 && !nearPlatform;
   if (leavingPlatform) {
     for (const p of passengers) {
-      if (p.state === 'waiting' && p.mesh.position.distanceTo(PLATFORM_BOARD_WORLD) < PLATFORM_LENGTH * 1.3) {
-        p.state = 'leaving';
-        p.leaveDir = new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize();
+      if (p.state === 'boarding' || p.state === 'chasing') {
+        // Those who left the platform but didn't board: walk back to their spot
+        p.state = 'returning';
+        p.targetWagon = null;
       }
     }
     train.hasVisitedPlatform = false; // reset so next visit must occur first
@@ -693,6 +694,25 @@ function updatePassengers(dt) {
       p.state = 'leaving';
       p.leaveDir = new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize();
       continue;
+    } else if (p.state === 'returning') {
+      // Walk back to original spot on the platform
+      const target = p.homePos.clone();
+      const dir = target.clone().sub(p.mesh.position);
+      dir.y = 0;
+      const dist = dir.length();
+      const speed = 2.8;
+      if (dist < 0.15) {
+        p.mesh.position.copy(target);
+        p.mesh.rotation.y = p.homeRot;
+        p.state = 'waiting';
+      } else {
+        dir.normalize();
+        p.mesh.position.x += dir.x * speed * dt;
+        p.mesh.position.z += dir.z * speed * dt;
+        const targetY = p.homePos.y;
+        p.mesh.position.y += (targetY - p.mesh.position.y) * Math.min(1, dt * 4);
+        p.mesh.rotation.y = Math.atan2(dir.x, dir.z);
+      }
     } else if (p.state === 'leaving') {
       const speed = 2.0;
       p.mesh.position.x += p.leaveDir.x * speed * dt;
